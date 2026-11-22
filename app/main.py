@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.endpoints import admin_endpoint, chat_endpoint
 from app.repositories.admin_repo import AdminRepository
@@ -33,6 +34,18 @@ app = FastAPI(
     description="Modular AI Gateway รองรับมาตรฐาน OpenAI API, Mock AI Simulator และระบบจัดการสิทธิ์",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",  # React / Vite
+        "http://localhost:3000",  # Next.js
+        "http://127.0.0.1:5500",  # VS Code Live Server (HTML ธรรมดา)
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(chat_endpoint.router)
