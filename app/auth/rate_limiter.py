@@ -1,6 +1,6 @@
 import time
 from collections import defaultdict, deque
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.api_key_handler import verify_virtual_api_key
 from app.repositories.admin_repo import AdminRepository
@@ -40,38 +40,41 @@ rate_limiter = InMemoryRateLimiter()
 
 async def enforce_rate_limit(
     api_key: ApiKey = Depends(verify_virtual_api_key),
+    x_provider_api_key: str | None = Header(default=None, alias="X-Provider-Api-Key"),
     db: AsyncSession = Depends(get_db),
 ) -> ApiKey:
     """
     Dependency สำหรับตรวจสิทธิ์ API Key, ดึงโควต้าจาก Role (ถ้าไม่ได้ Override),
-    ตรวจงบประมาณ (Budget) และเช็กความเร็วการยิง (RPM)
+    ตรวจงบประมาณ (เฉพาะคีย์กลาง) และเช็กความเร็วการยิง (RPM)
     """
+    is_byok = bool(x_provider_api_key and x_provider_api_key.strip())
+
     role_policy: RolePolicy | None = None
     if api_key.role_name:
         admin_repo = AdminRepository(db)
         role_policy = await admin_repo.get_role_by_name(api_key.role_name)
 
-    # เก็บแนบไว้ใน Object ชั่วคราว เพื่อให้ chat_endpoint เช็ก allowed_models ได้โดยไม่ต้อง Query ซ้ำ
     setattr(api_key, "_role_policy", role_policy)
 
-    # 1. ตรวจงบประมาณ (Override ของคีย์ > ค่าเริ่มต้นของ Role)
-    effective_budget = (
-        api_key.max_budget_usd
-        if api_key.max_budget_usd is not None
-        else (role_policy.default_max_budget_usd if role_policy else None)
-    )
-    if effective_budget is not None and api_key.current_spend_usd >= effective_budget:
-        role_label = f" (role='{api_key.role_name}')" if api_key.role_name else ""
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=(
-                f"Budget limit exceeded{role_label}. "
-                f"Current spend: ${api_key.current_spend_usd:.6f} / "
-                f"Max budget: ${effective_budget:.6f}"
-            ),
+    # 1. ตรวจงบประมาณกลาง (ข้ามหากผู้ใช้พกคีย์ส่วนตัว BYOK มาเอง)
+    if not is_byok:
+        effective_budget = (
+            api_key.max_budget_usd
+            if api_key.max_budget_usd is not None
+            else (role_policy.default_max_budget_usd if role_policy else None)
         )
+        if effective_budget is not None and api_key.current_spend_usd >= effective_budget:
+            role_label = f" (role='{api_key.role_name}')" if api_key.role_name else ""
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=(
+                    f"Budget limit exceeded{role_label}. "
+                    f"Current spend: ${api_key.current_spend_usd:.6f} / "
+                    f"Max budget: ${effective_budget:.6f}"
+                ),
+            )
 
-    # 2. ตรวจความเร็วการยิง (Override ของคีย์ > ค่าเริ่มต้นของ Role)
+    # 2. ตรวจความเร็วการยิง (บังคับใช้ทั้งคีย์กลางและ BYOK เพื่อป้องกันการยิงถล่ม Gateway)
     effective_rpm = (
         api_key.rate_limit_per_minute
         if api_key.rate_limit_per_minute is not None

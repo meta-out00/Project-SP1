@@ -41,18 +41,32 @@ export type UsageLog = {
   prompt_tokens: number
   completion_tokens: number
   total_tokens: number
-  latency_ms: number
   cost_usd: number
+  is_byok: boolean
+  latency_ms: number
   status_code: number
   error_message: string | null
   created_at: string
 }
 
+export type BreakdownItem = {
+  name: string
+  requests: number
+  total_tokens: number
+  cost_usd: number
+}
+
 export type UsageSummary = {
   total_requests: number
-  successful_requests: number
+  success_requests: number
   failed_requests: number
+  total_prompt_tokens: number
+  total_completion_tokens: number
   total_tokens: number
+  system_cost_usd: number
+  byok_cost_usd: number
   total_cost_usd: number
-  average_latency_ms: number
+  avg_latency_ms: number
+  by_model: BreakdownItem[]
+  by_provider: BreakdownItem[]
 }

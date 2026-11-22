@@ -1,32 +1,32 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import {
-  Activity,
-  BarChart3,
-  Boxes,
-  ChevronDown,
-  CircleGauge,
-  KeyRound,
-  Layers3,
-  LogOut,
-  Menu,
-  RefreshCw,
-  Settings,
-  MessageSquare,
-  Users,
-  X,
+    Activity,
+    BarChart3,
+    Boxes,
+    ChevronDown,
+    CircleGauge,
+    KeyRound,
+    Layers3,
+    LogOut,
+    Menu,
+    MessageSquare,
+    RefreshCw,
+    Settings,
+    Users,
+    X,
 } from 'lucide-react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { apiFetch } from './api'
 import { LoginScreen } from './components/LoginScreen'
 import { Modal } from './components/Shared'
-import { DashboardPage } from './pages/DashboardPage'
-import { ProvidersPage } from './pages/ProvidersPage'
-import { ModelsPage } from './pages/ModelsPage'
 import { ApiKeysPage } from './pages/ApiKeysPage'
-import { RolesPage } from './pages/RolesPage'
+import { DashboardPage } from './pages/DashboardPage'
 import { LogsPage } from './pages/LogsPage'
-import { SettingsPage } from './pages/SettingsPage'
+import { ModelsPage } from './pages/ModelsPage'
 import { PlaygroundPage } from './pages/PlaygroundPage'
+import { ProvidersPage } from './pages/ProvidersPage'
+import { RolesPage } from './pages/RolesPage'
+import { SettingsPage } from './pages/SettingsPage'
 import type { ApiKey, Provider, Role, UsageLog, UsageSummary } from './types'
 
 type Page = 'dashboard' | 'playground' | 'providers' | 'models' | 'api-keys' | 'users' | 'logs' | 'settings'
@@ -68,8 +68,8 @@ function App() {
         apiFetch<Provider[]>('/admin/providers', authToken),
         apiFetch<ApiKey[]>('/admin/api-keys', authToken),
         apiFetch<Role[]>('/admin/roles', authToken),
-        apiFetch<UsageLog[]>('/admin/logs/usage?limit=100', authToken),
-        apiFetch<UsageSummary>('/admin/logs/usage/summary', authToken),
+        apiFetch<UsageLog[]>('/admin/usage-logs?limit=100&offset=0', authToken),
+        apiFetch<UsageSummary>('/admin/analytics/summary', authToken),
       ])
       setProviders(providerData)
       setApiKeys(keyData)

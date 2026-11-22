@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
 import { Bot, Send, Settings2, Trash2, User } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Provider } from '../types'
 
 type Message = {
@@ -14,6 +14,8 @@ export function PlaygroundPage({ models }: { models: Provider[] }) {
   const [temperature, setTemperature] = useState(0.7)
   const [maxTokens, setMaxTokens] = useState(512)
   const [stream, setStream] = useState(false)
+  const [mockDelay, setMockDelay] = useState(0)
+  const [mockErrorCode, setMockErrorCode] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -74,6 +76,8 @@ export function PlaygroundPage({ models }: { models: Provider[] }) {
           temperature,
           max_tokens: maxTokens,
           stream,
+          mock_delay: mockDelay,
+          mock_error_code: mockErrorCode ? Number(mockErrorCode) : null,
         }),
       })
 
@@ -188,6 +192,26 @@ export function PlaygroundPage({ models }: { models: Provider[] }) {
               value={maxTokens}
               onChange={(event) => setMaxTokens(Number(event.target.value))}
             />
+          </label>
+
+          <label>Mock delay (seconds)
+            <input
+              type="number"
+              min="0"
+              max="60"
+              step="0.1"
+              value={mockDelay}
+              onChange={(event) => setMockDelay(Number(event.target.value))}
+            />
+          </label>
+
+          <label>Mock error
+            <select value={mockErrorCode} onChange={(event) => setMockErrorCode(event.target.value)}>
+              <option value="">None</option>
+              <option value="429">429 Too Many Requests</option>
+              <option value="500">500 Internal Server Error</option>
+              <option value="503">503 Service Unavailable</option>
+            </select>
           </label>
 
           <label className="toggle-row">

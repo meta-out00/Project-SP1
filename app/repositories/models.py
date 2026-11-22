@@ -79,6 +79,7 @@ class UsageLog(Base):
     total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     latency_ms: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    is_byok: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status_code: Mapped[int] = mapped_column(Integer, default=200, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

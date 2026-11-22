@@ -15,8 +15,9 @@ class UsageLoggerHook:
         response: ChatCompletionResponse,
         latency_ms: float,
         api_key_id: Optional[int] = None,
+        is_byok: bool = False,
     ) -> None:
-        """คำนวณค่าใช้จ่าย บันทึก Log และอัปเดตยอดใช้จ่ายสะสมของ API Key"""
+        """คำนวณค่าใช้จ่าย บันทึก Log และอัปเดตยอดใช้จ่ายสะสมของ API Key (เฉพาะคีย์กลาง)"""
         cost_usd = CostCalculator.calculate_cost(
             model_name=response.model,
             prompt_tokens=response.usage.prompt_tokens,
@@ -33,11 +34,13 @@ class UsageLoggerHook:
             completion_tokens=response.usage.completion_tokens,
             total_tokens=response.usage.total_tokens,
             cost_usd=cost_usd,
+            is_byok=is_byok,
             latency_ms=latency_ms,
             status_code=200,
         )
 
-        if api_key_id is not None and cost_usd > 0:
+        # หักงบกลางเฉพาะกรณีที่ใช้คีย์ของระบบ (ไม่หักถ้าผู้ใช้พกคีย์ส่วนตัว BYOK มาเอง)
+        if api_key_id is not None and cost_usd > 0 and not is_byok:
             await repo.increment_api_key_spend(api_key_id=api_key_id, cost_usd=cost_usd)
 
     @staticmethod
@@ -49,6 +52,7 @@ class UsageLoggerHook:
         status_code: int,
         error_message: str,
         api_key_id: Optional[int] = None,
+        is_byok: bool = False,
     ) -> None:
         """บันทึก Log เมื่อเกิดข้อผิดพลาดจากค่าย AI (เช่น 429, 500, 503)"""
         repo = LogRepository(db)
@@ -58,6 +62,7 @@ class UsageLoggerHook:
             api_key_id=api_key_id,
             provider_name=provider_name,
             model_name=model_name,
+            is_byok=is_byok,
             latency_ms=latency_ms,
             status_code=status_code,
             error_message=error_message,

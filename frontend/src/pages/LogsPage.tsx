@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { Activity, RefreshCw, Search } from 'lucide-react'
+import { useState } from 'react'
 import type { UsageLog } from '../types'
 
 export function LogsPage({
@@ -28,7 +28,7 @@ export function LogsPage({
         {filtered.length ? (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Time</th><th>Request ID</th><th>Provider</th><th>Model</th><th>Status</th><th>Latency</th><th>Prompt</th><th>Completion</th><th>Total Tokens</th><th>Cost</th></tr></thead>
+              <thead><tr><th>Time</th><th>Request ID</th><th>Provider</th><th>Model</th><th>Billing</th><th>Status</th><th>Latency</th><th>Prompt</th><th>Completion</th><th>Total Tokens</th><th>Cost</th></tr></thead>
               <tbody>
                 {filtered.map((log) => (
                   <tr key={log.id}>
@@ -36,6 +36,7 @@ export function LogsPage({
                     <td className="muted-cell">{log.request_id}</td>
                     <td>{log.provider_name}</td>
                     <td>{log.model_name}</td>
+                    <td><span className="type-chip">{log.is_byok ? 'BYOK' : 'System'}</span></td>
                     <td><span className={`http-status ${log.status_code >= 400 ? 'error' : ''}`}>{log.status_code}</span></td>
                     <td>{log.latency_ms.toFixed(2)} ms</td>
                     <td>{log.prompt_tokens}</td>

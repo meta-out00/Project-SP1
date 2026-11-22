@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.jwt_handler import get_current_admin
 from app.auth.security import create_access_token, verify_password
@@ -8,18 +8,18 @@ from app.repositories.log_repo import LogRepository
 from app.repositories.models import User
 from app.schemas.admin_schema import (
     AdminLoginRequest,
+    AnalyticsSummaryResponse,
     ApiKeyCreateRequest,
     ApiKeyCreateResponse,
     ApiKeyItemResponse,
+    AuditLogItemResponse,
     ProviderCreateRequest,
     ProviderResponse,
     RolePolicyCreateRequest,
     RolePolicyResponse,
     RolePolicyUpdateRequest,
     TokenResponse,
-    UsageLogResponse,
-    UsageLogSummaryResponse,
-    AuditLogResponse,
+    UsageLogItemResponse,
 )
 
 router = APIRouter(prefix="/admin", tags=["Control Plane - Admin Management"])
@@ -317,34 +317,50 @@ async def delete_role_policy(
     )
     return {"message": f"Role '{role_name}' deleted successfully."}
 
+# ==========================================
+# 5. รายงานสถิติและประวัติการใช้งาน (Analytics & Logs)
+# ==========================================
+@router.get("/analytics/summary", response_model=AnalyticsSummaryResponse)
+async def get_analytics_summary(
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """สรุปภาพรวมการใช้งานทั้งระบบ (แยกยอดงบกลาง vs BYOK และแยกตามโมเดล/ค่าย AI)"""
+    log_repo = LogRepository(db)
+    return await log_repo.get_analytics_summary()
 
-# ==========================================
-# 5. Request and Audit Logs
-# ==========================================
-@router.get("/logs/usage", response_model=list[UsageLogResponse])
+
+@router.get("/usage-logs", response_model=list[UsageLogItemResponse])
 async def list_usage_logs(
-    limit: int = 100,
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    api_key_id: int | None = Query(default=None),
+    model_name: str | None = Query(default=None),
+    status_code: int | None = Query(default=None),
+    is_byok: bool | None = Query(default=None),
     current_admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """อ่านรายการ Request/Usage Log ล่าสุด"""
-    return await LogRepository(db).list_usage_logs(limit=max(1, min(limit, 500)))
+    """ดูประวัติการเรียกใช้งาน AI ล่าสุด (รองรับการกรองและแบ่งหน้า)"""
+    log_repo = LogRepository(db)
+    return await log_repo.list_usage_logs(
+        limit=limit,
+        offset=offset,
+        api_key_id=api_key_id,
+        model_name=model_name,
+        status_code=status_code,
+        is_byok=is_byok,
+    )
 
 
-@router.get("/logs/usage/summary", response_model=UsageLogSummaryResponse)
-async def get_usage_summary(
-    current_admin: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """สรุปจำนวน Request, Error, Token, Cost และ Latency"""
-    return await LogRepository(db).get_usage_summary()
-
-
-@router.get("/logs/audit", response_model=list[AuditLogResponse])
+@router.get("/audit-logs", response_model=list[AuditLogItemResponse])
 async def list_audit_logs(
-    limit: int = 100,
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    action: str | None = Query(default=None, description="เช่น CREATE_API_KEY, ADMIN_LOGIN_SUCCESS"),
     current_admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """อ่านรายการ Audit Log ล่าสุด"""
-    return await LogRepository(db).list_audit_logs(limit=max(1, min(limit, 500)))
+    """ดูประวัติการจัดการระบบของแอดมิน (Security Audit Trail)"""
+    log_repo = LogRepository(db)
+    return await log_repo.list_audit_logs(limit=limit, offset=offset, action=action)

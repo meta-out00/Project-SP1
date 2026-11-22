@@ -25,7 +25,7 @@ class GatewayRouter:
     ตัวกลางควบคุมเส้นทางคำขอ (Routing Engine)
     - รองรับทั้ง Non-Streaming และ SSE Streaming
     - รองรับทั้ง Managed Key (จาก DB) และ BYOK (X-Provider-Api-Key)
-    - จับเวลาและบันทึก Telemetry ลง usage_logs อัตโนมัติ
+    - จับเวลาและบันทึก Telemetry ลง usage_logs อัตโนมัติ (แยกยอด Managed vs BYOK)
     """
 
     def __init__(self):
@@ -45,20 +45,21 @@ class GatewayRouter:
         if request.model.startswith("mock-"):
             return self.mock_handler, "built-in-mock"
 
+        cleaned_byok = byok_api_key.strip() if byok_api_key else None
         admin_repo = AdminRepository(db)
         provider = await admin_repo.get_active_provider_for_model(request.model)
 
         if provider:
             base_url = provider.base_url
             provider_name = provider.name
-            if byok_api_key:
-                resolved_api_key = byok_api_key
+            if cleaned_byok:
+                resolved_api_key = cleaned_byok
             elif provider.encrypted_api_key:
                 resolved_api_key = decrypt_provider_key(provider.encrypted_api_key)
             else:
                 resolved_api_key = None
         else:
-            if not byok_api_key:
+            if not cleaned_byok:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=(
@@ -68,7 +69,7 @@ class GatewayRouter:
                 )
             base_url = self._infer_default_base_url(request.model)
             provider_name = "byok-direct"
-            resolved_api_key = byok_api_key
+            resolved_api_key = cleaned_byok
 
         handler = OpenAICompatibleHandler(
             base_url=base_url,
@@ -85,6 +86,7 @@ class GatewayRouter:
         byok_api_key: str | None = None,
     ) -> ChatCompletionResponse:
         handler, provider_name = await self.resolve_handler(request, db, byok_api_key)
+        is_byok = bool(byok_api_key and byok_api_key.strip())
 
         start_time = time.perf_counter()
         try:
@@ -96,6 +98,7 @@ class GatewayRouter:
                 response=response,
                 latency_ms=latency_ms,
                 api_key_id=api_key_id,
+                is_byok=is_byok,
             )
             return response
 
@@ -109,6 +112,7 @@ class GatewayRouter:
                 status_code=http_exc.status_code,
                 error_message=str(http_exc.detail),
                 api_key_id=api_key_id,
+                is_byok=is_byok,
             )
             raise
 
@@ -122,6 +126,7 @@ class GatewayRouter:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 error_message=str(exc),
                 api_key_id=api_key_id,
+                is_byok=is_byok,
             )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -134,6 +139,7 @@ class GatewayRouter:
         provider_name: str,
         request: ChatCompletionRequest,
         api_key_id: int | None = None,
+        is_byok: bool = False,
     ) -> AsyncGenerator[str, None]:
         start_time = time.perf_counter()
         stream_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
@@ -190,6 +196,7 @@ class GatewayRouter:
                     response=synthetic_response,
                     latency_ms=latency_ms,
                     api_key_id=api_key_id,
+                    is_byok=is_byok,
                 )
 
         except HTTPException as http_exc:
@@ -203,6 +210,7 @@ class GatewayRouter:
                     status_code=http_exc.status_code,
                     error_message=str(http_exc.detail),
                     api_key_id=api_key_id,
+                    is_byok=is_byok,
                 )
             err_payload = {
                 "error": {"message": str(http_exc.detail), "code": http_exc.status_code}

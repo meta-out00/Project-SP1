@@ -34,7 +34,7 @@ export function DashboardPage({
           <div className="panel-header"><div><p className="eyebrow">ACTIVITY</p><h2>Request Status</h2></div></div>
           {usageSummary ? (
             <div className="status-metrics">
-              <div><strong>{usageSummary.successful_requests}</strong><span>Successful</span></div>
+              <div><strong>{usageSummary.success_requests}</strong><span>Successful</span></div>
               <div className="failed"><strong>{usageSummary.failed_requests}</strong><span>Failed</span></div>
               <div><strong>{usageSummary.total_tokens}</strong><span>Total tokens</span></div>
             </div>
@@ -47,7 +47,7 @@ export function DashboardPage({
           {usageSummary ? (
             <div className="latency-metric">
               <Clock3 size={22} />
-              <div><strong>{usageSummary.average_latency_ms.toFixed(2)} ms</strong><span>Average processing time</span></div>
+              <div><strong>{usageSummary.avg_latency_ms.toFixed(2)} ms</strong><span>Average processing time</span></div>
             </div>
           ) : (
             <div className="empty-state compact"><Clock3 size={22} /><div><strong>Loading latency</strong></div></div>
